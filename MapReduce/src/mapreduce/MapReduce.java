@@ -1,10 +1,16 @@
+package mapreduce;
+
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.nio.file.Paths;
+
 
 public class MapReduce {
         
@@ -20,21 +26,35 @@ public class MapReduce {
                 
                 //get path of the files
                 //for the 3 files, read it's content store it in an arraylist
-                List<String> records = new ArrayList<String>();
-                try {
-                    BufferedReader reader = new BufferedReader(new FileReader(filename));
-                    String line;
-                    while ((line = reader.readLine()) != null){
-                      records.add(line);
+                String currentPath = Paths.get(".").toAbsolutePath().normalize().toString();
+                currentPath = currentPath.substring(0, currentPath.length() - 10);  //change directory down one file
+                
+                ArrayList<ArrayList> contentArray = new ArrayList<ArrayList>();
+                for(int i=0; i<3;i++){
+                    String filePath = currentPath+"/file"+(i+1)+".txt";
+                    
+                    try {
+                        File file = new File(filePath);
+                        System.out.println(filePath);
+                        FileReader thisFile = new FileReader(file);
+                        BufferedReader reader = new BufferedReader(thisFile);
+  
+                        String line = reader.readLine();
+                        
+                        while (line != null) {
+                            ArrayList<String> doc = new ArrayList<String>();
+                            doc.add(line);
+                            contentArray.add(doc);
+                            line = reader.readLine();
+                        }
+                    } catch (Exception e) {
+                        System.err.format("Exception occurred trying to read the file%s.", i+1);
+                        e.printStackTrace();
                     }
-                    reader.close();
-                }
-                catch (Exception e) {
-                    System.err.format("Exception occurred trying to read '%s'.", filename);
-                    e.printStackTrace();
+                    
                 }
                 
-
+                System.out.println("Content Array = " + contentArray);
                 // we want to go to here (OUTPUT)
                 
                 // "foo" => { "file1.txt" => 2, "file3.txt" => 3, "file2.txt" => 1 }
