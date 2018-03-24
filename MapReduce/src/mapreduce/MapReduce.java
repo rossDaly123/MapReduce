@@ -2,6 +2,7 @@ package mapreduce;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,11 +11,18 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.nio.file.Paths;
+import java.util.Scanner;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+import static jdk.nashorn.tools.ShellFunctions.input;
 
 
 public class MapReduce {
         
-        public static void main(String[] args) {
+        public static void main(String[] args) throws FileNotFoundException, InterruptedException, ExecutionException {
                 
                 // the problem:
                 
@@ -26,35 +34,28 @@ public class MapReduce {
                 
                 //get path of the files
                 //for the 3 files, read it's content store it in an arraylist
+                //TODO: Ask user for filepaths
                 String currentPath = Paths.get(".").toAbsolutePath().normalize().toString();
                 currentPath = currentPath.substring(0, currentPath.length() - 10);  //change directory down one file
+                int poolSize = 10; // TODO: Ask user for desired size
                 
+                                
                 ArrayList<ArrayList> contentArray = new ArrayList<ArrayList>();
+                ArrayList<String> doc = new ArrayList<String>();
                 for(int i=0; i<3;i++){
                     String filePath = currentPath+"/file"+(i+1)+".txt";
+                    System.out.println("FILEPATH: " + filePath);
                     
-                    try {
-                        File file = new File(filePath);
-                        System.out.println(filePath);
-                        FileReader thisFile = new FileReader(file);
-                        BufferedReader reader = new BufferedReader(thisFile);
-  
-                        String line = reader.readLine();
-                        
-                        while (line != null) {
-                            ArrayList<String> doc = new ArrayList<String>();
-                            doc.add(line);
-                            contentArray.add(doc);
-                            line = reader.readLine();
-                        }
-                    } catch (Exception e) {
-                        System.err.format("Exception occurred trying to read the file%s.", i+1);
-                        e.printStackTrace();
+                    Scanner s = new Scanner(new File(filePath));
+                    
+                    while (s.hasNext()){
+                        doc.add(s.next());
                     }
-                    
+                    s.close();
+                    contentArray.add(doc);                   
                 }
                 
-                System.out.println("Content Array = " + contentArray);
+                 System.out.println("Content Array = " + contentArray.get(0).get(4));
                 // we want to go to here (OUTPUT)
                 
                 // "foo" => { "file1.txt" => 2, "file3.txt" => 3, "file2.txt" => 1 }
@@ -76,24 +77,26 @@ public class MapReduce {
                 // INPUT:
                 ///////////
                 
-                Map<String, String> input = new HashMap<String, String>();
-                input.put("file1.txt", "foo foo bar cat dog dog");
-                input.put("file2.txt", "foo house cat cat dog");
-                input.put("file3.txt", "foo foo foo bird");
-                
+                Map<String, ArrayList> input = new HashMap<String, ArrayList>();
+                input.put("file1.txt", contentArray);
+//                input.put("file2.txt", "foo house cat cat dog");
+//                input.put("file3.txt", "foo foo foo bird");
                 // APPROACH #1: Brute force
                 {
+                        System.out.println("Approach 1:");
                         Map<String, Map<String, Integer>> output = new HashMap<String, Map<String, Integer>>();
                         
-                        Iterator<Map.Entry<String, String>> inputIter = input.entrySet().iterator();
+                        Iterator<Map.Entry<String, ArrayList>> inputIter = input.entrySet().iterator();
                         while(inputIter.hasNext()) {
-                                Map.Entry<String, String> entry = inputIter.next();
+                                Map.Entry<String, ArrayList> entry = inputIter.next();
                                 String file = entry.getKey();
-                                String contents = entry.getValue();
+                                String contents = entry.getValue().toString();  
                                 
-                                String[] words = contents.trim().split("\\s+");
-                                
-                                for(String word : words) {
+                               String[] words = contents.replaceAll("[^a-zA-Z ]", "").toLowerCase().split("\\s+");
+                               // String[] words = contents.trim().split("\\s+");
+//                                for(int i=0; i<contents.size(); i++){
+                                 for(String word : words) {
+//                                
                                         
                                         Map<String, Integer> files = output.get(word);
                                         if (files == null) {
@@ -108,6 +111,7 @@ public class MapReduce {
                                                 files.put(file, occurrences.intValue() + 1);
                                         }
                                 }
+                               
                         }
                         
                         // show me:
@@ -115,19 +119,20 @@ public class MapReduce {
                 }
 
                 
-                // APPROACH #2: MapReduce
+//                // APPROACH #2: MapReduce
                 {
+                        System.out.println("Approach 2:");
                         Map<String, Map<String, Integer>> output = new HashMap<String, Map<String, Integer>>();
                         
                         // MAP:
                         
                         List<MappedItem> mappedItems = new LinkedList<MappedItem>();
                         
-                        Iterator<Map.Entry<String, String>> inputIter = input.entrySet().iterator();
+                         Iterator<Map.Entry<String, ArrayList>> inputIter = input.entrySet().iterator();
                         while(inputIter.hasNext()) {
-                                Map.Entry<String, String> entry = inputIter.next();
+                                Map.Entry<String, ArrayList> entry = inputIter.next();
                                 String file = entry.getKey();
-                                String contents = entry.getValue();
+                                String contents = entry.getValue().toString();
                                 
                                 map(file, contents, mappedItems);
                         }
@@ -164,9 +169,11 @@ public class MapReduce {
                 }
                 
                 
-                // APPROACH #3: Distributed MapReduce
-                {
+//                // APPROACH #3: Distributed MapReduce
+                {       System.out.println("Approach 3:");
                         final Map<String, Map<String, Integer>> output = new HashMap<String, Map<String, Integer>>();
+                       // Create thread pool
+                        ExecutorService executor = (ThreadPoolExecutor)Executors.newFixedThreadPool(poolSize);
                         
                         // MAP:
                         
@@ -179,23 +186,30 @@ public class MapReduce {
                 }
                         };
                         
-                        List<Thread> mapCluster = new ArrayList<Thread>(input.size());
-                        
-                        Iterator<Map.Entry<String, String>> inputIter = input.entrySet().iterator();
+                        List<Thread> mapCluster = new ArrayList<Thread>(input.size());  
+
+                        Iterator<Map.Entry<String, ArrayList>> inputIter = input.entrySet().iterator();
                         while(inputIter.hasNext()) {
-                                Map.Entry<String, String> entry = inputIter.next();
-                                final String file = entry.getKey();
-                                final String contents = entry.getValue();
+                                Map.Entry<String, ArrayList> entry = inputIter.next();
+  
+                                final String file = entry.getKey(); 
+                                final String contents = entry.getValue().toString();
+
                                 
                                 Thread t = new Thread(new Runnable() {
                                         @Override
-                    public void run() {
-                                                map(file, contents, mapCallback);
-                    }
+                                        public void run() {
+                                           // System.out.println("Inside map thread");
+                                            map(file, contents, mapCallback);
+                                            
+                                        }
                                 });
                                 mapCluster.add(t);
-                                t.start();
+                                Future future = executor.submit(t);
+                                future.get(); //TODO: Should I block the thread here??
+                              //  t.start();
                         }
+                        
                         
                         // wait for mapping phase to be over:
                         for(Thread t : mapCluster) {
@@ -242,12 +256,14 @@ public class MapReduce {
                                 
                                 Thread t = new Thread(new Runnable() {
                                         @Override
-                    public void run() {
-                                                reduce(word, list, reduceCallback);
-                                        }
+                                    public void run() {         //System.out.println("Inside reduce thread");
+                                        reduce(word, list, reduceCallback);
+                                    }
                                 });
                                 reduceCluster.add(t);
-                                t.start();
+                                Future future = executor.submit(t);
+                                future.get();
+                                //t.start();
                         }
                         
                         // wait for reducing phase to be over:
@@ -260,11 +276,17 @@ public class MapReduce {
                         }
                         
                         System.out.println(output);
+                        executor.shutdown();
+                        
+                        while (!executor.isTerminated()) {
+        }
+                        
+        System.out.println("Finished all threads");
                 }
         }
         
         public static void map(String file, String contents, List<MappedItem> mappedItems) {
-                String[] words = contents.trim().split("\\s+");
+                String[] words = contents.replaceAll("[^a-zA-Z ]", "").toLowerCase().split("\\s+");
                 for(String word: words) {
                         mappedItems.add(new MappedItem(word, file));
                 }
@@ -289,7 +311,7 @@ public class MapReduce {
         }
         
         public static void map(String file, String contents, MapCallback<String, MappedItem> callback) {
-                String[] words = contents.trim().split("\\s+");
+               String[] words = contents.replaceAll("[^a-zA-Z ]", "").toLowerCase().split("\\s+");
                 List<MappedItem> results = new ArrayList<MappedItem>(words.length);
                 for(String word: words) {
                         results.add(new MappedItem(word, file));
