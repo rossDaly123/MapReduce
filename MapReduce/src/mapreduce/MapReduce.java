@@ -173,6 +173,9 @@ public class MapReduce {
                 
 //                // APPROACH #3: Distributed MapReduce
                 {       System.out.println("Approach 3:");
+                        
+                        long startTime = System.nanoTime();     //Start timer
+                
                         final Map<String, Map<String, Integer>> output = new HashMap<String, Map<String, Integer>>();
                        // Create thread pool
                         ExecutorService executor = (ThreadPoolExecutor)Executors.newFixedThreadPool(poolSize);
@@ -282,8 +285,14 @@ public class MapReduce {
                         
                         while (!executor.isTerminated()) {
         }
-                        
+        long endTime = System.nanoTime();   //finish timer count
+        
         System.out.println("Finished all threads");
+        
+        
+
+        long duration = (endTime - startTime);
+        System.out.println("The total runtime of approach 3: "+duration);
                 }
         }
         
