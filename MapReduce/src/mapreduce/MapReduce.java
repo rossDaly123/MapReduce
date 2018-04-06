@@ -19,7 +19,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import static jdk.nashorn.tools.ShellFunctions.input;
 
-
 public class MapReduce {
         
         public static void main(String[] args) throws FileNotFoundException, InterruptedException, ExecutionException {
@@ -37,9 +36,12 @@ public class MapReduce {
                 //TODO: Ask user for filepaths
                 String currentPath = Paths.get(".").toAbsolutePath().normalize().toString();
                 currentPath = currentPath.substring(0, currentPath.length() - 10);  //change directory down one file
-                int poolSize = 10; // TODO: Ask user for desired size
+           
+                Scanner reader = new Scanner(System.in);
+                System.out.println("Number of threads: ");
+                int poolSize = reader.nextInt();
+                reader.close();
                 
-                                
                 ArrayList<ArrayList> contentArray = new ArrayList<ArrayList>();
                 ArrayList<String> doc = new ArrayList<String>();
                 for(int i=0; i<3;i++){
