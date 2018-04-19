@@ -19,7 +19,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import static jdk.nashorn.tools.ShellFunctions.input;
 
-public class MapReduce {
+public class MapReduce2 {
 
     public static void main(String[] args) throws FileNotFoundException, InterruptedException, ExecutionException {
 
@@ -165,9 +165,10 @@ public class MapReduce {
         // APPROACH #3: Distributed MapReduce
         {
             System.out.println("Approach 3:");
-            long startTime = System.nanoTime();     //Start timer
-            
 
+               
+            //Start timer
+            long startTime = System.nanoTime();  
             final Map<String, Map<String, Integer>> output = new HashMap<String, Map<String, Integer>>();
             // Create thread pool
             ExecutorService executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(poolSize);
@@ -181,8 +182,8 @@ public class MapReduce {
                     mappedItems.addAll(results);
                 }
             };
-
-            List<Thread> mapCluster = new ArrayList<Thread>(input.size());
+           // Don't think I need this because threadpool is doing the job..
+           // List<Thread> mapCluster = new ArrayList<Thread>(input.size());
 
             Iterator<Map.Entry<String, ArrayList>> inputIter = input.entrySet().iterator();
             while (inputIter.hasNext()) {
@@ -199,13 +200,13 @@ public class MapReduce {
 
                     }
                 });
-                //mapCluster.add(t);
+              //  mapCluster.add(t); 
                 Future mapFuture = executor.submit(t);
-                mapFuture.get(); //TODO: Should I block the thread here??
+                mapFuture.get(); //TODO: Should I block the thread here?? I think so...
                 //  t.start();
             }
 
-            // wait for mapping phase to be over:
+            // wait for mapping phase to be over: TODO: I think I can remove this as future.get() does the job...
 //            for (Thread t : mapCluster) {
 //                try {
 //                    t.join();
@@ -216,20 +217,29 @@ public class MapReduce {
 
             // GROUP:
             Map<String, List<String>> groupedItems = new HashMap<String, List<String>>();
-
             Iterator<MappedItem> mappedIter = mappedItems.iterator();
-            while (mappedIter.hasNext()) {
-                MappedItem item = mappedIter.next();
-                String word = item.getWord();
-                String file = item.getFile();
-                List<String> list = groupedItems.get(word);
-                if (list == null) {
-                    list = new LinkedList<String>();
-                    groupedItems.put(word, list);
-                }
-                list.add(file);
-            }
-
+            
+            Thread t1 = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (mappedIter.hasNext()) {
+                        MappedItem item = mappedIter.next();
+                        String word = item.getWord();
+                        String file = item.getFile();
+                        List<String> list = groupedItems.get(word);
+                        if (list == null) {
+                            list = new LinkedList<String>();
+                            groupedItems.put(word, list);
+                        }
+                        list.add(file);
+                    }
+                }  
+            }); 
+            
+            // Add thread to pool
+            Future groupFuture = executor.submit(t1);
+            groupFuture.get();  //Wait until threads have been executed
+            
             // REDUCE:
             final ReduceCallback<String, String, Integer> reduceCallback = new ReduceCallback<String, String, Integer>() {
                 @Override
@@ -253,9 +263,9 @@ public class MapReduce {
                     }
                 });
                 reduceCluster.add(t);
-//                Future future = executor.submit(t);
-//                future.get();
-                t.start();
+                //Future future = executor.submit(t);
+                //future.get();
+                //t.start();
             }
 
             // wait for reducing phase to be over:
@@ -266,13 +276,13 @@ public class MapReduce {
                     throw new RuntimeException(e);
                 }
             }
-
+            long endTime = System.nanoTime(); 
             System.out.println(output);
             executor.shutdown();
 
             while (!executor.isTerminated()) {
             }
-            long endTime = System.nanoTime();   //finish timer count
+              //finish timer count
 
             System.out.println("Finished all threads");
 
